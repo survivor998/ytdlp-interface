@@ -2,8 +2,9 @@ name: Build ytdlp-interface
 
 on:
   push:
-    branches: [ feat/github-token-auth ]
+    branches: [ feat/github-token-auth, main ]
   workflow_dispatch:
+    branches: [ '*' ]
 
 jobs:
   build:
