@@ -20,16 +20,6 @@ jobs:
         if (Test-Path $deps) {
           7z x $deps "-o$PWD" -y
           Write-Host "Dependencies extracted"
-          # List structure
-          Get-ChildItem -Directory | ForEach-Object { Write-Host "DIR: $($_.Name)" }
-          Write-Host "=== bit7z contents ==="
-          Get-ChildItem -Path "bit7z" -Recurse -Depth 2 | ForEach-Object { Write-Host $_.FullName }
-          Write-Host "=== nana contents ==="
-          Get-ChildItem -Path "nana" -Recurse -Depth 2 | ForEach-Object { Write-Host $_.FullName }
-          Write-Host "=== libpng contents ==="
-          Get-ChildItem -Path "libpng" -Recurse -Depth 2 | ForEach-Object { Write-Host $_.FullName }
-          Write-Host "=== libjpeg-turbo contents ==="
-          Get-ChildItem -Path "libjpeg-turbo-3.1.2" -Recurse -Depth 2 | ForEach-Object { Write-Host $_.FullName }
         } else {
           Write-Error "Dependencies archive not found"
           exit 1
@@ -40,43 +30,80 @@ jobs:
       with:
         arch: x64
 
-    - name: Build dependencies and main project
+    - name: Build bit7z
       shell: pwsh
       run: |
-        # Build bit7z x64
-        Write-Host "=== Building bit7z ==="
         cd bit7z
-        if (Test-Path "CMakeLists.txt") {
-          mkdir build -Force | Out-Null
-          cd build
-          cmake .. -A x64 -DBIT7Z_BUILD_SHARED=OFF -DBIT7Z_BUILD_TESTS=OFF
-          cmake --build . --config Release
-          cmake --install . --prefix "../bin"
-        } elseif (Test-Path "bit7z.sln") {
-          msbuild bit7z.sln /p:Configuration=Release /p:Platform=x64 /m
-        } else {
-          Write-Host "Checking for pre-built libs..."
-          Get-ChildItem -Recurse -Filter "*.lib" | ForEach-Object { Write-Host $_.FullName }
-        }
-        cd $env:GITHUB_WORKSPACE
+        mkdir build -Force | Out-Null
+        cd build
+        cmake .. -A x64
+        cmake --build . --config Release
+        Write-Host "bit7z built. Libs:"
+        Get-ChildItem -Recurse -Filter "*.lib" | ForEach-Object { Write-Host $_.FullName }
 
-        # Build nana
-        Write-Host "=== Building nana ==="
+    - name: Build nana
+      shell: pwsh
+      run: |
         cd nana
-        if (Test-Path "CMakeLists.txt") {
+        mkdir build -Force | Out-Null
+        cd build
+        cmake .. -A x64
+        cmake --build . --config Release
+        Write-Host "nana built. Libs:"
+        Get-ChildItem -Recurse -Filter "*.lib" | ForEach-Object { Write-Host $_.FullName }
+
+    - name: Build libpng
+      shell: pwsh
+      run: |
+        cd libpng
+        # Check if pre-built or needs cmake
+        $libFiles = Get-ChildItem -Recurse -Filter "*.lib" -ErrorAction SilentlyContinue
+        if ($libFiles) {
+          Write-Host "Pre-built libpng found:"
+          $libFiles | ForEach-Object { Write-Host $_.FullName }
+        } else {
+          Write-Host "Building libpng from source..."
           mkdir build -Force | Out-Null
           cd build
-          cmake .. -A x64 -DNANA_CMAKE_STD_STRING_VIEW=ON -DNANA_CMAKE_STD_MAKE_UNIQUE=ON -DNANA_CMAKE_STD_OPTIONAL=ON
+          cmake .. -A x64
           cmake --build . --config Release
-        } elseif (Test-Path "build\ytdlp-interface.sln") {
-          msbuild build\ytdlp-interface.sln /p:Configuration=Release /p:Platform=x64 /m
-        } else {
-          Get-ChildItem -Recurse -Filter "*.lib" | ForEach-Object { Write-Host $_.FullName }
         }
-        cd $env:GITHUB_WORKSPACE
 
-        # Build main project
-        Write-Host "=== Building ytdlp-interface ==="
+    - name: Build libjpeg-turbo
+      shell: pwsh
+      run: |
+        cd libjpeg-turbo-3.1.2
+        $libFiles = Get-ChildItem -Recurse -Filter "*.lib" -ErrorAction SilentlyContinue
+        if ($libFiles) {
+          Write-Host "Pre-built libjpeg-turbo found:"
+          $libFiles | ForEach-Object { Write-Host $_.FullName }
+        } else {
+          Write-Host "Building libjpeg-turbo from source..."
+          mkdir build -Force | Out-Null
+          cd build
+          cmake .. -A x64
+          cmake --build . --config Release
+        }
+
+    - name: Stage library paths
+      shell: pwsh
+      run: |
+        # nana: copy to expected location and name
+        $nanaLibDir = "nana\build\bin"
+        New-Item -ItemType Directory -Force -Path $nanaLibDir | Out-Null
+        $nanaLib = Get-ChildItem -Path "nana" -Recurse -Filter "nana*.lib" | Select-Object -First 1
+        if ($nanaLib) {
+          Copy-Item $nanaLib.FullName "$nanaLibDir\nana_v143_Release_x64.lib"
+          Write-Host "Staged nana: $nanaLibDir\nana_v143_Release_x64.lib"
+        }
+
+        # List all .lib files for debugging
+        Write-Host "=== All .lib files ==="
+        Get-ChildItem -Recurse -Filter "*.lib" | ForEach-Object { Write-Host $_.FullName }
+
+    - name: Build ytdlp-interface
+      shell: pwsh
+      run: |
         cd ytdlp-interface
         msbuild ytdlp-interface.vcxproj /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m
 
@@ -87,5 +114,4 @@ jobs:
         name: ytdlp-interface-x64
         path: |
           ytdlp-interface/x64/Release/ytdlp-interface.exe
-          ytdlp-interface/Release/x64/ytdlp-interface.exe
         if-no-files-found: warn
