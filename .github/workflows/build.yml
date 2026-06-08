@@ -19,7 +19,7 @@ jobs:
       run: |
         $deps = "ytdlp-interface dependencies.7z"
         if (Test-Path $deps) {
-          7z x $deps -o. -y
+          7z x $deps "-o$PWD" -y
           Write-Host "Dependencies extracted successfully"
           Get-ChildItem -Directory | ForEach-Object { Write-Host $_.Name }
         } else {
@@ -36,12 +36,7 @@ jobs:
       shell: pwsh
       run: |
         cd ytdlp-interface
-        msbuild ytdlp-interface.vcxproj `
-          /p:Configuration=Release `
-          /p:Platform=x64 `
-          /p:PlatformToolset=v143 `
-          /p:WindowsTargetPlatformVersion=10.0 `
-          /m
+        msbuild ytdlp-interface.vcxproj /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
