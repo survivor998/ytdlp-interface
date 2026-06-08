@@ -19,9 +19,14 @@ jobs:
       run: |
         $deps = "ytdlp-interface dependencies.7z"
         if (Test-Path $deps) {
+          # Extract to repo root - deps expect to be at ..\ relative to ytdlp-interface\
           7z x $deps "-o$PWD" -y
-          Write-Host "Dependencies extracted successfully"
+          Write-Host "=== Top-level directories ==="
           Get-ChildItem -Directory | ForEach-Object { Write-Host $_.Name }
+          Write-Host "=== bit7z check ==="
+          Get-ChildItem -Path "bit7z" -Recurse -Filter "*.lib" | ForEach-Object { Write-Host $_.FullName }
+          Write-Host "=== nana check ==="
+          Get-ChildItem -Path "nana\build\bin" -Filter "*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
         } else {
           Write-Error "Dependencies archive not found: $deps"
           exit 1
@@ -42,5 +47,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ytdlp-interface-x64
-        path: ytdlp-interface/Release/x64/ytdlp-interface.exe
+        path: ytdlp-interface/x64/Release/ytdlp-interface.exe
         if-no-files-found: error
